@@ -20,7 +20,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -30,7 +29,6 @@ import com.example.dietplanner.ui.viewmodel.UserViewModel
 
 @Composable
 fun UserProfileScreen(navController: NavController) {
-    val context = LocalContext.current
     var imageUri by remember { mutableStateOf<Uri?>(null) }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -39,15 +37,15 @@ fun UserProfileScreen(navController: NavController) {
         imageUri = uri
     }
 
-    var activityLevel by remember { mutableStateOf("Active") }
-    var goal by remember { mutableStateOf("Maintain Weight") }
     val userViewModel: UserViewModel = hiltViewModel()
     val user by userViewModel.user.collectAsState()
+    val error by userViewModel.error.collectAsState()
 
     val fullName = user?.fullName ?: "Loading..."
     val ageText = user?.age?.toString() ?: "Loading..."
     val heightText = user?.height_cm?.toString() ?: "Loading..."
     val weightText = user?.weight_kg?.toString() ?: "Loading..."
+    val activityLevel = user?.activity_level ?: "Loading..."
 
     var showDialog by remember { mutableStateOf(false) }
     var currentField by remember { mutableStateOf("") }
@@ -78,6 +76,14 @@ fun UserProfileScreen(navController: NavController) {
                 .padding(vertical = 20.dp)
                 .align(Alignment.Start)
         )
+
+        error?.let {
+            Text(
+                text = it,
+                color = Color.Red,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+        }
 
         Box(
             modifier = Modifier
@@ -111,9 +117,11 @@ fun UserProfileScreen(navController: NavController) {
 
         Column(modifier = Modifier.fillMaxWidth()) {
             ProfileItem("Age: $ageText") { openEditDialog("Age", ageText) }
-            ProfileItem("Height: ${heightText} cm") { openEditDialog("Height", heightText) }
-            ProfileItem("Weight: ${weightText} kg") { openEditDialog("Weight", weightText) }
-            ProfileItem("Activity Level: $activityLevel") { openEditDialog("Activity Level", activityLevel) }
+            ProfileItem("Height: $heightText cm") { openEditDialog("Height", heightText) }
+            ProfileItem("Weight: $weightText kg") { openEditDialog("Weight", weightText) }
+            ProfileItem("Activity Level: $activityLevel") {
+                openEditDialog("Activity Level", activityLevel)
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -139,19 +147,34 @@ fun UserProfileScreen(navController: NavController) {
             onDismiss = { showDialog = false },
             onSave = { newValue ->
                 when (currentField) {
-                    "Age" -> {}
-                    "Height" -> {}
-                    "Weight" -> {}
-                    "Activity Level" -> activityLevel = newValue
-                    "Goal" -> goal = newValue
+                    "Age" -> {
+                        newValue.toIntOrNull()?.let { age ->
+                            userViewModel.updateProfile(age = age)
+                        }
+                    }
+
+                    "Height" -> {
+                        newValue.toFloatOrNull()?.let { height ->
+                            userViewModel.updateProfile(heightCm = height)
+                        }
+                    }
+
+                    "Weight" -> {
+                        newValue.toFloatOrNull()?.let { weight ->
+                            userViewModel.updateProfile(weightKg = weight)
+                        }
+                    }
+
+                    "Activity Level" -> {
+                        userViewModel.updateProfile(activityLevel = newValue)
+                    }
                 }
+
                 showDialog = false
             }
         )
     }
 }
-
-
 
 @Composable
 fun ProfileItem(text: String, onClick: () -> Unit) {
@@ -194,7 +217,6 @@ fun EditDialog(
         "Very Active",
         "Extra Active"
     )
-    val goalOptions = listOf("Lose Weight", "Maintain Weight", "Gain Weight")
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -209,14 +231,7 @@ fun EditDialog(
                         onSelected = { updatedValue = it }
                     )
                 }
-                "Goal" -> {
-                    DropdownSelector(
-                        options = goalOptions,
-                        selected = updatedValue,
-                        label = "Select Goal",
-                        onSelected = { updatedValue = it }
-                    )
-                }
+
                 else -> {
                     OutlinedTextField(
                         value = updatedValue,
@@ -228,10 +243,14 @@ fun EditDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(updatedValue) }) { Text("Save") }
+            TextButton(onClick = { onSave(updatedValue) }) {
+                Text("Save")
+            }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
         }
     )
 }
@@ -259,6 +278,7 @@ fun DropdownSelector(
                 .menuAnchor()
                 .fillMaxWidth()
         )
+
         ExposedDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false }

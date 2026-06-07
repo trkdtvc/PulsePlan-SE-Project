@@ -6,9 +6,9 @@ import com.example.dietplanner.model.User
 import com.example.dietplanner.repository.UserRepository
 import com.example.dietplanner.session.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -41,6 +41,7 @@ class UserViewModel @Inject constructor(
             val id = userRepository.insert(user)
             sessionManager.saveUserId(id.toInt())
             _user.value = user.copy(user_id = id.toInt())
+            _error.value = null
         } catch (e: Exception) {
             _error.value = "Registration failed: ${e.message}"
         }
@@ -52,6 +53,7 @@ class UserViewModel @Inject constructor(
             if (user != null) {
                 sessionManager.saveUserId(user.user_id)
                 _user.value = user
+                _error.value = null
             } else {
                 _error.value = "Invalid email or password"
             }
@@ -63,14 +65,44 @@ class UserViewModel @Inject constructor(
     fun loadUserById(id: Int) = viewModelScope.launch {
         try {
             _user.value = userRepository.getUserById(id)
+            _error.value = null
         } catch (e: Exception) {
             _error.value = "Failed to load user: ${e.message}"
+        }
+    }
+
+    fun updateProfile(
+        age: Int? = null,
+        heightCm: Float? = null,
+        weightKg: Float? = null,
+        activityLevel: String? = null
+    ) = viewModelScope.launch {
+        val currentUser = _user.value
+
+        if (currentUser == null) {
+            _error.value = "No logged-in user found"
+            return@launch
+        }
+
+        try {
+            val updatedUser = currentUser.copy(
+                age = age ?: currentUser.age,
+                height_cm = heightCm ?: currentUser.height_cm,
+                weight_kg = weightKg ?: currentUser.weight_kg,
+                activity_level = activityLevel ?: currentUser.activity_level
+            )
+
+            userRepository.update(updatedUser)
+            _user.value = updatedUser
+            _error.value = null
+        } catch (e: Exception) {
+            _error.value = "Profile update failed: ${e.message}"
         }
     }
 
     fun logout() = viewModelScope.launch {
         sessionManager.clearSession()
         _user.value = null
+        _error.value = null
     }
 }
-
