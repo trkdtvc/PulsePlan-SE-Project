@@ -3,13 +3,13 @@ package com.example.dietplanner.ui.theme.screens
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +23,7 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -31,17 +32,20 @@ import com.example.dietplanner.R
 import com.example.dietplanner.ui.theme.screens.viewmodel.MealViewModel
 import com.example.dietplanner.ui.viewmodel.MealLogViewModel
 import com.example.dietplanner.ui.viewmodel.UserViewModel
+import com.example.dietplanner.ui.viewmodel.WaterIntakeViewModel
 
 @Composable
 fun HomeScreen(
     userViewModel: UserViewModel = hiltViewModel(),
     viewModel: MealLogViewModel = hiltViewModel(),
     mealVm: MealViewModel = hiltViewModel(),
+    waterViewModel: WaterIntakeViewModel = hiltViewModel(),
     navController: NavController
 ) {
     val meals by viewModel.meals.collectAsState()
     val error by viewModel.error.collectAsState()
     val user by userViewModel.user.collectAsState()
+    val waterState by waterViewModel.waterState.collectAsState()
 
     val dailyCalorieGoal = user?.let {
         calculateDailyCalories(
@@ -95,6 +99,7 @@ fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(brush = lightGreenGradient)
+            .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
         Row(
@@ -200,6 +205,17 @@ fun HomeScreen(
             context.startActivity(Intent.createChooser(intent, "Share your progress via"))
         }
 
+        WaterIntakeCard(
+            amountMl = waterState.amountMl,
+            goalMl = waterState.goalMl,
+            onAddWater = { waterViewModel.addWater() },
+            onRemoveWater = { waterViewModel.removeWater() },
+            onResetWater = { waterViewModel.resetWater() },
+            onGoalSave = { newGoal ->
+                waterViewModel.setGoal(newGoal)
+            }
+        )
+
         Spacer(modifier = Modifier.height(16.dp))
 
         Row(
@@ -213,48 +229,152 @@ fun HomeScreen(
             MacroProgress("Carbs", "${carbsLeft.toInt()}g", carbsProgress, Color.Blue)
         }
 
+        Text(
+            text = "Daily Meals",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.Black,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        if (meals.isEmpty()) {
+            Text(
+                text = "No meals added yet",
+                color = Color.Gray,
+                modifier = Modifier.padding(16.dp)
+            )
+        } else {
+            meals.forEach { meal ->
+                val icon = getIconForFood(meal.food_name)
+                val kcal = (meal.calories_per_100g * meal.quantity_g / 100).toInt()
+
+                MealItem(
+                    title = meal.food_name,
+                    kcal = "$kcal kcal",
+                    icon = icon,
+                    onDelete = {
+                        viewModel.deleteMealLog(meal.id)
+                    }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(80.dp))
+    }
+}
+
+@Composable
+fun WaterIntakeCard(
+    amountMl: Int,
+    goalMl: Int,
+    onAddWater: () -> Unit,
+    onRemoveWater: () -> Unit,
+    onResetWater: () -> Unit,
+    onGoalSave: (Int) -> Unit
+) {
+    var goalInput by remember(goalMl) { mutableStateOf(goalMl.toString()) }
+    val progress = if (goalMl > 0) {
+        (amountMl.toFloat() / goalMl.toFloat()).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
         Column(
-            modifier = Modifier
-                .fillMaxHeight()
-                .padding(bottom = 18.dp),
-            verticalArrangement = Arrangement.Bottom
+            modifier = Modifier.padding(16.dp)
         ) {
             Text(
-                text = "Daily Meals",
-                fontSize = 20.sp,
+                text = "Water Intake",
+                fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black,
-                modifier = Modifier.padding(bottom = 8.dp)
+                color = Color.Black
             )
 
-            LazyColumn(
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "$amountMl ml of $goalMl ml",
+                fontSize = 15.sp,
+                color = Color.DarkGray
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            LinearProgressIndicator(
+                progress = progress,
+                color = Color(0xFF03A9F4),
+                trackColor = Color.LightGray,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 300.dp)
-            ) {
-                if (meals.isEmpty()) {
-                    item {
-                        Text(
-                            text = "No meals added yet",
-                            color = Color.Gray,
-                            modifier = Modifier.padding(16.dp)
-                        )
-                    }
-                } else {
-                    items(meals.size) { index ->
-                        val meal = meals[index]
-                        val icon = getIconForFood(meal.food_name)
-                        val kcal = (meal.calories_per_100g * meal.quantity_g / 100).toInt()
+                    .height(10.dp)
+            )
 
-                        MealItem(
-                            title = meal.food_name,
-                            kcal = "$kcal kcal",
-                            icon = icon,
-                            onDelete = {
-                                viewModel.deleteMealLog(meal.id)
-                            }
-                        )
-                    }
+            if (amountMl > goalMl) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Daily water goal exceeded",
+                    color = Color(0xFF00796B),
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Button(
+                    onClick = onAddWater,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
+                ) {
+                    Text("+250 ml", color = Color.White)
+                }
+
+                OutlinedButton(onClick = onRemoveWater) {
+                    Text("-250 ml")
+                }
+
+                OutlinedButton(onClick = onResetWater) {
+                    Text("Reset")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = goalInput,
+                    onValueChange = { value ->
+                        if (value.all { it.isDigit() }) {
+                            goalInput = value
+                        }
+                    },
+                    label = { Text("Goal ml") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.width(140.dp)
+                )
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Button(
+                    onClick = {
+                        goalInput.toIntOrNull()?.let { goal ->
+                            onGoalSave(goal)
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
+                ) {
+                    Text("Save Goal", color = Color.White)
                 }
             }
         }
