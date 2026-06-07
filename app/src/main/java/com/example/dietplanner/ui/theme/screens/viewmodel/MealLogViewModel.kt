@@ -26,27 +26,53 @@ class MealLogViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             sessionManager.userIdFlow.filterNotNull().collect { userId ->
-                try {
-                    _meals.value = mealLogRepository.getMealsWithFoodByUser(userId)
-                } catch (e: Exception) {
-                    _error.value = "Failed to load meals: ${e.message}"
-                }
+                loadMeals(userId)
             }
+        }
+    }
+
+    private suspend fun loadMeals(userId: Int) {
+        try {
+            _meals.value = mealLogRepository.getMealsWithFoodByUser(userId)
+            _error.value = null
+        } catch (e: Exception) {
+            _error.value = "Failed to load meals: ${e.message}"
         }
     }
 
     fun addMealLog(foodId: Int, grams: Double) = viewModelScope.launch {
         try {
             val userId = sessionManager.userIdFlow.firstOrNull()
+
             if (userId != null) {
-                val log = MealLog(user_id = userId, food_id = foodId, quantity_g = grams.toFloat())
+                val log = MealLog(
+                    user_id = userId,
+                    food_id = foodId,
+                    quantity_g = grams.toFloat()
+                )
+
                 mealLogRepository.insert(log)
-                _meals.value = mealLogRepository.getMealsWithFoodByUser(userId)
+                loadMeals(userId)
             } else {
                 _error.value = "User not logged in"
             }
         } catch (e: Exception) {
             _error.value = "Failed to add meal: ${e.message}"
+        }
+    }
+
+    fun deleteMealLog(mealLogId: Int) = viewModelScope.launch {
+        try {
+            val userId = sessionManager.userIdFlow.firstOrNull()
+
+            if (userId != null) {
+                mealLogRepository.deleteMealLogById(mealLogId, userId)
+                loadMeals(userId)
+            } else {
+                _error.value = "User not logged in"
+            }
+        } catch (e: Exception) {
+            _error.value = "Failed to delete meal: ${e.message}"
         }
     }
 }

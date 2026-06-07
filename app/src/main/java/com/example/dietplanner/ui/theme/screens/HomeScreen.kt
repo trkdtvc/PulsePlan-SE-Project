@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
@@ -26,9 +27,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.example.dietplanner.ui.viewmodel.MealLogViewModel
 import com.example.dietplanner.R
 import com.example.dietplanner.ui.theme.screens.viewmodel.MealViewModel
+import com.example.dietplanner.ui.viewmodel.MealLogViewModel
 import com.example.dietplanner.ui.viewmodel.UserViewModel
 
 @Composable
@@ -40,7 +41,6 @@ fun HomeScreen(
 ) {
     val meals by viewModel.meals.collectAsState()
     val error by viewModel.error.collectAsState()
-
     val user by userViewModel.user.collectAsState()
 
     val dailyCalorieGoal = user?.let {
@@ -52,14 +52,26 @@ fun HomeScreen(
             activityLevel = it.activity_level
         )
     } ?: 2200f
+
     val dailyProteinGoal = (dailyCalorieGoal * 0.25) / 4
     val dailyFatGoal = (dailyCalorieGoal * 0.30) / 9
     val dailyCarbsGoal = (dailyCalorieGoal * 0.45) / 4
 
-    val totalCalories = meals.sumOf { (it.calories_per_100g * it.quantity_g / 100).toInt() }.toFloat()
-    val totalProtein = meals.sumOf { (it.protein_g * it.quantity_g / 100).toDouble() }
-    val totalFat = meals.sumOf { (it.fats_g * it.quantity_g / 100).toDouble() }
-    val totalCarbs = meals.sumOf { (it.carbs_g * it.quantity_g / 100).toDouble() }
+    val totalCalories = meals.sumOf {
+        (it.calories_per_100g * it.quantity_g / 100).toInt()
+    }.toFloat()
+
+    val totalProtein = meals.sumOf {
+        (it.protein_g * it.quantity_g / 100).toDouble()
+    }
+
+    val totalFat = meals.sumOf {
+        (it.fats_g * it.quantity_g / 100).toDouble()
+    }
+
+    val totalCarbs = meals.sumOf {
+        (it.carbs_g * it.quantity_g / 100).toDouble()
+    }
 
     val proteinLeft = (dailyProteinGoal - totalProtein).coerceAtLeast(0.0)
     val fatLeft = (dailyFatGoal - totalFat).coerceAtLeast(0.0)
@@ -145,6 +157,7 @@ fun HomeScreen(
                     color = Color(0xFFFFA726),
                     strokeWidth = 10.dp
                 )
+
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = "${totalCalories.toInt()} kcal",
@@ -157,18 +170,24 @@ fun HomeScreen(
                         fontSize = 16.sp,
                         color = Color.Black
                     )
-                    Text(text = "$burnedKcal BURNED", fontSize = 16.sp, color = Color.Black)
+                    Text(
+                        text = "$burnedKcal BURNED",
+                        fontSize = 16.sp,
+                        color = Color.Black
+                    )
                 }
             }
+
             Button(
                 onClick = { navController.navigate("running") },
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
             ) {
                 Text("Start Running Timer", color = Color.White)
             }
-
         }
+
         val context = LocalContext.current
+
         ShareProgressCard(
             totalCalories = totalCalories,
             burnedCalories = burnedKcal
@@ -180,10 +199,6 @@ fun HomeScreen(
             }
             context.startActivity(Intent.createChooser(intent, "Share your progress via"))
         }
-
-
-
-
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -230,14 +245,21 @@ fun HomeScreen(
                         val meal = meals[index]
                         val icon = getIconForFood(meal.food_name)
                         val kcal = (meal.calories_per_100g * meal.quantity_g / 100).toInt()
-                        MealItem(meal.food_name, "$kcal kcal", icon)
+
+                        MealItem(
+                            title = meal.food_name,
+                            kcal = "$kcal kcal",
+                            icon = icon,
+                            onDelete = {
+                                viewModel.deleteMealLog(meal.id)
+                            }
+                        )
                     }
                 }
             }
         }
     }
 }
-
 
 @Composable
 fun MacroProgress(label: String, value: String, progress: Float, color: Color) {
@@ -249,6 +271,7 @@ fun MacroProgress(label: String, value: String, progress: Float, color: Color) {
     ) {
         Text(text = label, fontSize = 20.sp, fontWeight = FontWeight.Bold)
         Text(text = value, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+
         LinearProgressIndicator(
             progress = progress,
             color = color,
@@ -262,7 +285,12 @@ fun MacroProgress(label: String, value: String, progress: Float, color: Color) {
 }
 
 @Composable
-fun MealItem(title: String, kcal: String, icon: ImageVector) {
+fun MealItem(
+    title: String,
+    kcal: String,
+    icon: ImageVector,
+    onDelete: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -279,8 +307,23 @@ fun MealItem(title: String, kcal: String, icon: ImageVector) {
             modifier = Modifier.size(32.dp),
             tint = Color(0xFF4CAF50)
         )
-        Text(text = title, fontWeight = FontWeight.Medium)
-        Text(text = kcal, fontWeight = FontWeight.SemiBold)
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 12.dp)
+        ) {
+            Text(text = title, fontWeight = FontWeight.Medium)
+            Text(text = kcal, fontWeight = FontWeight.SemiBold)
+        }
+
+        IconButton(onClick = onDelete) {
+            Icon(
+                imageVector = Icons.Default.Delete,
+                contentDescription = "Delete meal",
+                tint = Color.Red
+            )
+        }
     }
 }
 
@@ -295,6 +338,7 @@ fun getIconForFood(foodName: String): ImageVector {
         else -> ImageVector.vectorResource(id = R.drawable.baseline_fastfood_24)
     }
 }
+
 @Composable
 fun ShareProgressCard(
     totalCalories: Float,
@@ -366,4 +410,3 @@ fun calculateDailyCalories(
 
     return bmr * activityFactor
 }
-
