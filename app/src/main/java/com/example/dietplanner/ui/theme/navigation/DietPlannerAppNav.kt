@@ -6,7 +6,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.viewModelScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -21,13 +20,11 @@ import com.example.dietplanner.ui.theme.screens.UserProfileScreen
 import com.example.dietplanner.ui.theme.screens.navigations.BottomNavBar
 import com.example.dietplanner.ui.viewmodel.MealLogViewModel
 import com.example.dietplanner.ui.theme.screens.viewmodel.MealViewModel
-import com.example.dietplanner.ui.theme.screens.viewmodel.ShareProgressViewModel
 
 @Composable
 fun DietPlannerAppNav() {
     val navController = rememberNavController()
 
-    // Inject shared ViewModel
     val mealViewModel: MealLogViewModel = hiltViewModel()
     val mealVm: MealViewModel = hiltViewModel()
 
@@ -49,34 +46,56 @@ fun DietPlannerAppNav() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable("registration") {
-                RegistrationScreen(onRegistrationSuccess = {
-                    navController.navigate("login") {
-                        popUpTo("registration") { inclusive = true }
+                RegistrationScreen(
+                    onRegistrationSuccess = {
+                        navController.navigate("login") {
+                            popUpTo("registration") {
+                                inclusive = true
+                            }
+                        }
+                    },
+                    onLoginClick = {
+                        navController.navigate("login") {
+                            popUpTo("registration") {
+                                inclusive = true
+                            }
+                        }
                     }
-                })
+                )
             }
+
             composable("login") {
                 LoginScreen(
                     onLoginSuccess = {
                         navController.navigate("home") {
-                            popUpTo("login") { inclusive = true }
+                            popUpTo("login") {
+                                inclusive = true
+                            }
                         }
                     },
                     navController = navController
                 )
             }
+
             composable("home") {
-                HomeScreen(viewModel = mealViewModel, mealVm = mealVm, navController = navController)
+                HomeScreen(
+                    viewModel = mealViewModel,
+                    mealVm = mealVm,
+                    navController = navController
+                )
             }
+
             composable("profile") {
                 UserProfileScreen(navController = navController)
             }
+
             composable("add") {
                 AddMealScreen(
                     navController = navController,
                     mealLogViewModel = mealViewModel
                 )
             }
+
             composable("running") {
                 RunningTimerScreen(
                     onFinish = { burnedCalories ->
@@ -85,6 +104,7 @@ fun DietPlannerAppNav() {
                     }
                 )
             }
+
             composable("share_progress") {
                 ShareScreenProgress()
             }

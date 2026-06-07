@@ -29,7 +29,10 @@ import com.example.dietplanner.ui.viewmodel.UserViewModel
 import kotlinx.coroutines.launch
 
 @Composable
-fun RegistrationScreen(onRegistrationSuccess: () -> Unit) {
+fun RegistrationScreen(
+    onRegistrationSuccess: () -> Unit,
+    onLoginClick: () -> Unit
+) {
     val userViewModel: UserViewModel = hiltViewModel()
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -194,6 +197,12 @@ fun RegistrationScreen(onRegistrationSuccess: () -> Unit) {
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007f9c))
             ) {
                 Text("Register", color = Color.White)
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            TextButton(onClick = onLoginClick) {
+                Text("Already have an account? Login", color = Color(0xFF007f9c))
             }
         }
     }
